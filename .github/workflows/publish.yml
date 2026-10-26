@@ -44,7 +44,7 @@ jobs:
       contents: read
     outputs:
       sha: ${{ steps.sha.outputs.sha }}
-      dist_tag: ${{ needs.preview.outputs.dist_tag }}
+      dist_tag: ${{ steps.dist.outputs.dist_tag }}
       version: ${{ steps.version.outputs.version }}
       version_command: ${{ steps.command.outputs.version_command }}
     steps:
@@ -84,7 +84,7 @@ jobs:
         id: command
         env:
           VERSION_OVERRIDE: ${{ inputs.version_override }}
-          DIST_TAG: ${{ needs.preview.outputs.dist_tag }}
+          DIST_TAG: ${{ steps.dist.outputs.dist_tag }}
         run: |
           set -euo pipefail
           VERSION_COMMAND="npx lerna version"
@@ -126,7 +126,7 @@ jobs:
       - name: Summary
         env:
           VERSION: ${{ steps.version.outputs.version }}
-          DIST_TAG: ${{ needs.preview.outputs.dist_tag }}
+          DIST_TAG: ${{ steps.dist.outputs.dist_tag }}
           SHA: ${{ steps.sha.outputs.sha }}
           REF_NAME: ${{ github.ref_name }}
           DRY_RUN: ${{ inputs.dry_run }}
