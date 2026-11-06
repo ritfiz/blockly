@@ -1103,6 +1103,58 @@ suite('Events', function () {
       }
     });
 
+    test('BlockChange event reordered past BlockCreate events', function () {
+      eventUtils.disable();
+      const parent = this.workspace.newBlock('inputs_test_block', 'parent');
+      const child1 = this.workspace.newBlock('statement_test_block', 'child1');
+      const child2 = this.workspace.newBlock('statement_test_block', 'child2');
+      eventUtils.enable();
+      const wsId = this.workspace.id;
+
+      try {
+        assert.equal(FIRE_QUEUE.length, 0);
+        const events = [
+          new Blockly.Events.BlockCreate(child1),
+          newConnectEvent(parent, child1, 'STATEMENT1', wsId),
+          new Blockly.Events.BlockCreate(child2),
+          newConnectEvent(parent, child2, 'STATEMENT2', wsId),
+          newMutationEvent(parent, wsId),
+        ];
+        events.map((e) => enqueueEvent(e));
+        assert.equal(FIRE_QUEUE.length, events.length, 'FIRE_QUEUE.length');
+        assert.equal(FIRE_QUEUE[0], events[4], 'FIRE_QUEUE[0]');
+        for (let i = 1; i < events.length; i++) {
+          assert.equal(FIRE_QUEUE[i], events[i - 1], `FIRE_QUEUE[${i}]`);
+        }
+      } finally {
+        FIRE_QUEUE.length = 0;
+      }
+    });
+
+    test('BlockChange event not reordered before its block is created', function () {
+      eventUtils.disable();
+      const parent = this.workspace.newBlock('inputs_test_block', 'parent');
+      const child = this.workspace.newBlock('statement_test_block', 'child');
+      eventUtils.enable();
+      const wsId = this.workspace.id;
+
+      try {
+        assert.equal(FIRE_QUEUE.length, 0);
+        const events = [
+          new Blockly.Events.BlockCreate(parent),
+          newConnectEvent(parent, child, 'STATEMENT1', wsId),
+          newMutationEvent(parent, wsId),
+        ];
+        events.map((e) => enqueueEvent(e));
+        assert.equal(FIRE_QUEUE.length, events.length, 'FIRE_QUEUE.length');
+        assert.equal(FIRE_QUEUE[0], events[0], 'FIRE_QUEUE[0]');
+        assert.equal(FIRE_QUEUE[1], events[2], 'FIRE_QUEUE[1]');
+        assert.equal(FIRE_QUEUE[2], events[1], 'FIRE_QUEUE[2]');
+      } finally {
+        FIRE_QUEUE.length = 0;
+      }
+    });
+
     test('BlockChange event for other workspace not reordered', function () {
       eventUtils.disable();
       const parent = this.workspace.newBlock('inputs_test_block', 'parent');

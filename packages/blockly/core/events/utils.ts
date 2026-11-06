@@ -134,11 +134,11 @@ function fireNow() {
  * Enqueue an event on FIRE_QUEUE.
  *
  * Normally this is equivalent to FIRE_QUEUE.push(event), but if the
- * enqueued event is a BlockChange event and the most recent event(s)
- * on the queue are BlockMove events that (re)connect other blocks to
- * the changed block (and belong to the same event group) then the
- * enqueued event will be enqueued before those events rather than
- * after.
+ * enqueued event is a mutation BlockChange event and the most recent
+ * event(s) on the queue (in the same event group) are BlockMove events
+ * that (re)connect other blocks to the changed block, or BlockCreate
+ * events for other blocks, then the enqueued event will be enqueued
+ * before those events rather than after.
  *
  * This is a workaround for a problem caused by the fact that
  * MutatorIcon.prototype.recomposeSourceBlock can only fire a
@@ -148,6 +148,12 @@ function fireNow() {
  * BlockChange event, causing issues with undo, mirroring, etc.; see
  * https://github.com/google/blockly/issues/8225#issuecomment-2195751783
  * (and following) for details.
+ *
+ * BlockCreate events are skipped over so that this also works when
+ * compose creates new blocks to fill the inputs it adds; see
+ * https://github.com/RaspberryPiFoundation/blockly/issues/10146.  A
+ * created block starts out unconnected, so creating it never depends
+ * on the changed block's inputs.
  */
 function enqueueEvent(event: Abstract) {
   if (isBlockChange(event) && event.element === 'mutation') {
@@ -156,12 +162,18 @@ function enqueueEvent(event: Abstract) {
       const otherEvent = FIRE_QUEUE[i - 1];
       if (
         otherEvent.group !== event.group ||
-        otherEvent.workspaceId !== event.workspaceId ||
-        !isBlockMove(otherEvent) ||
-        otherEvent.newParentId !== event.blockId
+        otherEvent.workspaceId !== event.workspaceId
       ) {
         break;
       }
+      const connectsToChangedBlock =
+        isBlockMove(otherEvent) && otherEvent.newParentId === event.blockId;
+      // The changed block must still be created before it is mutated.
+      const createsOtherBlocks =
+        isBlockCreate(otherEvent) &&
+        !!otherEvent.ids &&
+        !otherEvent.ids.includes(event.blockId ?? '');
+      if (!connectsToChangedBlock && !createsOtherBlocks) break;
     }
     FIRE_QUEUE.splice(i, 0, event);
     return;
